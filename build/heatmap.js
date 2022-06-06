@@ -22,6 +22,8 @@
 // Heatmap Config stores default values and will be merged with instance config
 var HeatmapConfig = {
   defaultRadius: 40,
+  defaultWidth: 0,
+  defaultHeight: 0,
   defaultRenderer: 'canvas2d',
   defaultGradient: { 0.25: "rgb(0,0,255)", 0.55: "rgb(0,255,0)", 0.85: "yellow", 1.0: "rgb(255,0,0)"},
   defaultMaxOpacity: 1,
@@ -30,6 +32,8 @@ var HeatmapConfig = {
   defaultXField: 'x',
   defaultYField: 'y',
   defaultValueField: 'value',
+  defaultWidthField: 'width',
+  defaultHeightField: 'height',
   plugins: {}
 };
 var Store = (function StoreClosure() {
@@ -38,11 +42,14 @@ var Store = (function StoreClosure() {
     this._coordinator = {};
     this._data = [];
     this._radi = [];
+    this._wh = [];
     this._min = 10;
     this._max = 1;
     this._xField = config['xField'] || config.defaultXField;
     this._yField = config['yField'] || config.defaultYField;
     this._valueField = config['valueField'] || config.defaultValueField;
+    this._widthField = config['widthField'] || config.defaultWidthField;
+    this._heightField = config['heightField'] || config.defaultHeightField;
 
     if (config["radius"]) {
       this._cfgRadius = config["radius"];
@@ -58,19 +65,26 @@ var Store = (function StoreClosure() {
         var y = dataPoint[this._yField];
         var radi = this._radi;
         var store = this._data;
+        var wh = this._wh;
         var max = this._max;
         var min = this._min;
         var value = dataPoint[this._valueField] || 1;
         var radius = dataPoint.radius || this._cfgRadius || defaultRadius;
+        var width = dataPoint[this._widthField]
+        var height = dataPoint[this._heightField]
 
         if (!store[x]) {
           store[x] = [];
           radi[x] = [];
+          wh[x] = [];
         }
 
         if (!store[x][y]) {
           store[x][y] = value;
           radi[x][y] = radius;
+          if (width && height) {
+            wh[x][y] = {width,height};
+          }
         } else {
           store[x][y] += value;
         }
@@ -96,6 +110,8 @@ var Store = (function StoreClosure() {
             y: y,
             value: value,
             radius: radius,
+            width,
+            height,
             min: min,
             max: max
           };
@@ -158,7 +174,6 @@ var Store = (function StoreClosure() {
       var dataPoints = data.data;
       var pointsLen = dataPoints.length;
 
-
       // reset data arrays
       this._data = [];
       this._radi = [];
@@ -196,6 +211,7 @@ var Store = (function StoreClosure() {
         max: this._max,
         min: this._min,
         data: this._data,
+        wh: this._wh,
         radi: this._radi
       };
     },
@@ -277,30 +293,41 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
     cxt.arc(radius + x, height - radius + y, radius, Math.PI * 1 / 2, Math.PI);
     cxt.closePath();
   }
-  var _getPointTemplate = function(radius, blurFactor) {
+  var _getPointTemplate = function(radius, blurFactor, width, height) {
     var tplCanvas = document.createElement('canvas');
     var tplCtx = tplCanvas.getContext('2d');
     var x = radius;
     var y = radius;
-    tplCanvas.width = 2000
-    tplCanvas.height = 1000;
+    if (width && height) {
+      tplCanvas.width = width;
+      tplCanvas.height = height;
+    } else {
+      tplCanvas.width = tplCanvas.height = radius*2;
+    }
+    console.log(width, height)
 
     if (blurFactor == 1) {
-      // tplCtx.beginPath();
-      // tplCtx.arc(x, y, radius, 0, 2 * Math.PI, false);
-      // tplCtx.fillStyle = 'rgba(0,0,0,1)';
-      // tplCtx.fill();
-    } else {
-      var gradient = tplCtx.createLinearGradient(x, y-50, x, y + 50);
+      tplCtx.beginPath();
+      tplCtx.arc(x, y, radius, 0, 2 * Math.PI, false);
+      tplCtx.fillStyle = 'rgba(0,0,0,1)';
+      tplCtx.fill();
+    } else if (width && height) {
+      // TODO 渐变位置
+      var gradient = tplCtx.createLinearGradient(x, y - height / 2, x, y + height / 2);
       gradient.addColorStop(0, 'rgba(0,0,0,1)');
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       tplCtx.fillStyle = gradient;
-      _drawRoundRect(tplCtx, 10, 10, 500, 50, 25)
+      _drawRoundRect(tplCtx, 0, 0, width, height, height / 2)
       tplCtx.fillStyle= gradient//若是给定了值就用给定的值否则给予默认值
       tplCtx.fill();
       tplCtx.restore();
+    } else {
+      var gradient = tplCtx.createRadialGradient(x, y, radius*blurFactor, x, y, radius);
+      gradient.addColorStop(0, 'rgba(0,0,0,1)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      tplCtx.fillStyle = gradient;
+      tplCtx.fillRect(0, 0, 2*radius, 2*radius);
     }
-    console.log(tplCtx);
     return tplCanvas;
   };
 
@@ -309,6 +336,7 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
     var min = data.min;
     var max = data.max;
     var radi = data.radi;
+    var wh = data.wh;
     var data = data.data;
 
     var xValues = Object.keys(data);
@@ -322,12 +350,18 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
         var yValue = yValues[yValuesLen];
         var value = data[xValue][yValue];
         var radius = radi[xValue][yValue];
-        renderData.push({
+        var tempData = {
           x: xValue,
           y: yValue,
           value: value,
-          radius: radius
-        });
+          radius: radius,
+        }
+        var whObj = wh[xValue][yValue]
+        if (whObj) {
+          tempData.width = whObj.width
+          tempData.height = whObj.height
+        }
+        renderData.push(tempData);
       }
     }
 
@@ -424,15 +458,17 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
       var max = this._max = data.max;
       var data = data.data || [];
       var dataLen = data.length;
+      console.log(data)
       // on a point basis?
       var blur = 1 - this._blur;
-
       while(dataLen--) {
 
         var point = data[dataLen];
 
         var x = point.x;
         var y = point.y;
+        var width = point.width;
+        var height = point.height;
         var radius = point.radius;
         // if value is bigger than max
         // use max as value
@@ -442,24 +478,17 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
         var shadowCtx = this.shadowCtx;
 
 
-
-
         var tpl;
-        console.log(blur)
-        if (!this._templates[radius]) {
-          console.log(1)
-          this._templates[radius] = tpl = _getPointTemplate(radius, blur);
+        if (!this._templates[`${x}-${y}`]) {
+          this._templates[`${x}-${y}`] = tpl = _getPointTemplate(radius, blur, width, height);
         } else {
-          console.log(2)
-          tpl = this._templates[radius];
+          tpl = this._templates[`${x}-${y}`];
         }
-        console.log(tpl)
         // value from minimum / value range
         // => [0, 1]
         var templateAlpha = (value-min)/(max-min);
         // this fixes #176: small values are not visible because globalAlpha < .01 cannot be read from imageData
         shadowCtx.globalAlpha = templateAlpha < .01 ? .01 : templateAlpha;
-        console.log( rectX, rectY)
         shadowCtx.drawImage(tpl, rectX, rectY);
 
         // update renderBoundaries
@@ -496,17 +525,13 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
       if (y < 0) {
         y = 0;
       }
-      console.log(width, height)
-      console.log(maxWidth, maxHeight)
       // if (x + width > maxWidth) {
       //   width = maxWidth - x;
       // }
       // if (y + height > maxHeight) {
       //   height = maxHeight - y;
       // }
-      console.log(width, height)
       var img = this.shadowCtx.getImageData(x, y, 1000, 1000);
-      console.log(img)
       var imgData = img.data;
       var len = imgData.length;
       var palette = this._palette;
@@ -635,6 +660,7 @@ var Heatmap = (function HeatmapClosure() {
     var renderer = scope._renderer;
     var coordinator = scope._coordinator;
     var store = scope._store;
+    console.log(renderer)
 
     coordinator.on('renderpartial', renderer.renderPartial, renderer);
     coordinator.on('renderall', renderer.renderAll, renderer);
