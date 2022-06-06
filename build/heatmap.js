@@ -2,7 +2,7 @@
  * heatmap.js v2.0.5 | JavaScript Heatmap Library
  *
  * Copyright 2008-2016 Patrick Wied <heatmapjs@patrick-wied.at> - All rights reserved.
- * Dual licensed under MIT and Beerware license 
+ * Dual licensed under MIT and Beerware license
  *
  * :: 2016-09-05 01:16
  */
@@ -29,7 +29,7 @@ var HeatmapConfig = {
   defaultBlur: .85,
   defaultXField: 'x',
   defaultYField: 'y',
-  defaultValueField: 'value', 
+  defaultValueField: 'value',
   plugins: {}
 };
 var Store = (function StoreClosure() {
@@ -91,13 +91,13 @@ var Store = (function StoreClosure() {
           }
           return false;
         } else {
-          return { 
-            x: x, 
+          return {
+            x: x,
             y: y,
-            value: value, 
+            value: value,
             radius: radius,
             min: min,
-            max: max 
+            max: max
           };
         }
     },
@@ -138,7 +138,7 @@ var Store = (function StoreClosure() {
           this.addData.call(this, dataArr[dataLen]);
         }
       } else {
-        // add to store  
+        // add to store
         var organisedEntry = this._organiseData(arguments[0], true);
         if (organisedEntry) {
           // if it's the first datapoint initialize the extremas with it
@@ -168,7 +168,7 @@ var Store = (function StoreClosure() {
       }
       this._max = data.max;
       this._min = data.min || 0;
-      
+
       this._onExtremaChange();
       this._coordinator.emit('renderall', this._getInternalData());
       return this;
@@ -192,11 +192,11 @@ var Store = (function StoreClosure() {
       this._coordinator = coordinator;
     },
     _getInternalData: function() {
-      return { 
+      return {
         max: this._max,
-        min: this._min, 
+        min: this._min,
         data: this._data,
-        radi: this._radi 
+        radi: this._radi
       };
     },
     getData: function() {
@@ -230,7 +230,7 @@ var Store = (function StoreClosure() {
                 }
               } else {
                 continue;
-              } 
+              }
             }
           }
         }
@@ -266,29 +266,41 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
 
     return paletteCtx.getImageData(0, 0, 256, 1).data;
   };
-
+  var _drawRoundRect = function drawRoundedRect(cxt, x, y, width, height, radius) {
+    cxt.beginPath();
+    cxt.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 3 / 2);
+    cxt.lineTo(width - radius + x, y);
+    cxt.arc(width - radius + x, radius + y, radius, Math.PI * 3 / 2, Math.PI * 2);
+    cxt.lineTo(width + x, height + y - radius);
+    cxt.arc(width - radius + x, height - radius + y, radius, 0, Math.PI * 1 / 2);
+    cxt.lineTo(radius + x, height +y);
+    cxt.arc(radius + x, height - radius + y, radius, Math.PI * 1 / 2, Math.PI);
+    cxt.closePath();
+  }
   var _getPointTemplate = function(radius, blurFactor) {
     var tplCanvas = document.createElement('canvas');
     var tplCtx = tplCanvas.getContext('2d');
     var x = radius;
     var y = radius;
-    tplCanvas.width = tplCanvas.height = radius*2;
+    tplCanvas.width = 2000
+    tplCanvas.height = 1000;
 
     if (blurFactor == 1) {
-      tplCtx.beginPath();
-      tplCtx.arc(x, y, radius, 0, 2 * Math.PI, false);
-      tplCtx.fillStyle = 'rgba(0,0,0,1)';
-      tplCtx.fill();
+      // tplCtx.beginPath();
+      // tplCtx.arc(x, y, radius, 0, 2 * Math.PI, false);
+      // tplCtx.fillStyle = 'rgba(0,0,0,1)';
+      // tplCtx.fill();
     } else {
-      var gradient = tplCtx.createRadialGradient(x, y, radius*blurFactor, x, y, radius);
+      var gradient = tplCtx.createLinearGradient(x, y-50, x, y + 50);
       gradient.addColorStop(0, 'rgba(0,0,0,1)');
       gradient.addColorStop(1, 'rgba(0,0,0,0)');
       tplCtx.fillStyle = gradient;
-      tplCtx.fillRect(0, 0, 2*radius, 2*radius);
+      _drawRoundRect(tplCtx, 10, 10, 500, 50, 25)
+      tplCtx.fillStyle= gradient//若是给定了值就用给定的值否则给予默认值
+      tplCtx.fill();
+      tplCtx.restore();
     }
-
-
-
+    console.log(tplCtx);
     return tplCanvas;
   };
 
@@ -433,17 +445,21 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
 
 
         var tpl;
+        console.log(blur)
         if (!this._templates[radius]) {
+          console.log(1)
           this._templates[radius] = tpl = _getPointTemplate(radius, blur);
         } else {
+          console.log(2)
           tpl = this._templates[radius];
         }
+        console.log(tpl)
         // value from minimum / value range
         // => [0, 1]
         var templateAlpha = (value-min)/(max-min);
         // this fixes #176: small values are not visible because globalAlpha < .01 cannot be read from imageData
         shadowCtx.globalAlpha = templateAlpha < .01 ? .01 : templateAlpha;
-
+        console.log( rectX, rectY)
         shadowCtx.drawImage(tpl, rectX, rectY);
 
         // update renderBoundaries
@@ -480,14 +496,17 @@ var Canvas2dRenderer = (function Canvas2dRendererClosure() {
       if (y < 0) {
         y = 0;
       }
-      if (x + width > maxWidth) {
-        width = maxWidth - x;
-      }
-      if (y + height > maxHeight) {
-        height = maxHeight - y;
-      }
-
-      var img = this.shadowCtx.getImageData(x, y, width, height);
+      console.log(width, height)
+      console.log(maxWidth, maxHeight)
+      // if (x + width > maxWidth) {
+      //   width = maxWidth - x;
+      // }
+      // if (y + height > maxHeight) {
+      //   height = maxHeight - y;
+      // }
+      console.log(width, height)
+      var img = this.shadowCtx.getImageData(x, y, 1000, 1000);
+      console.log(img)
       var imgData = img.data;
       var len = imgData.length;
       var palette = this._palette;
