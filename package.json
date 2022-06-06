@@ -1,5 +1,5 @@
 {
-  "name": "@mars3d/heatmap.js",
+  "name": "TT527/heatmap.js",
   "version": "2.0.6",
   "description": "Dynamic JavaScript Heatmaps for the Web",
   "main": "build/heatmap.js",
@@ -27,16 +27,15 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/muyao1987/heatmap.js.git"
+    "url": "https://github.com/TT527/heatmap.js.git"
   },
   "bugs": {
-    "url": "https://github.com/muyao1987/heatmap.js/issues",
+    "url": "https://github.com/TT527/heatmap.js/issues",
     "email": "wh@marsgis.cn"
   },
   "author": {
-    "name": "火星科技 木遥",
-    "url": "http://www.marsgis.cn"
+    "name": "tt"
   },
   "license": "ISC",
-  "homepage": "https://github.com/muyao1987/heatmap.js"
+  "homepage": "https://github.com/TT527/heatmap.js"
 }
